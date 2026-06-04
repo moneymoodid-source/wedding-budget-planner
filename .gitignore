@@ -1,0 +1,11 @@
+wedding-backend/node_modules/
+wedding-backend/.env
+wedding-backend/uploads/*
+!wedding-backend/uploads/.gitkeep
+
+wedding-frontend/dist/
+wedding-frontend/node_modules/
+
+**/.DS_Store
+**/Thumbs.db
+**/*.log
