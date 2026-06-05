@@ -88,12 +88,18 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
 
 // --- EMAIL TRANSPORTER ---
 const emailTransporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     }
 });
+
+emailTransporter.verify()
+    .then(() => console.log('SMTP transporter siap digunakan.'))
+    .catch((err) => console.error('SMTP transporter gagal diverifikasi:', err.message));
 
 async function sendEmail({ to, subject, html }) {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -112,6 +118,12 @@ async function sendEmail({ to, subject, html }) {
         console.log(`Email berhasil dikirim ke ${to}`);
     } catch (err) {
         console.error('Gagal mengirim email:', err.message);
+        if (err.code) {
+            console.error('SMTP error code:', err.code);
+        }
+        if (err.response) {
+            console.error('SMTP response:', err.response);
+        }
     }
 }
 
