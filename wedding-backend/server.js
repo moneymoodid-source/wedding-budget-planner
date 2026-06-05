@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, 'uploads');
 
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 
 if (!process.env.JWT_SECRET) {
@@ -50,6 +51,42 @@ function deleteFile(filePath) {
         } else {
             console.log('File tidak ditemukan:', absolutePath);
         }
+    });
+}
+
+function getPublicBaseUrl(req) {
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString().split(',')[0].trim();
+    const host = req.get('host');
+    return `${proto}://${host}`;
+}
+
+function normalizeImageList(images, req) {
+    if (!Array.isArray(images)) return [];
+    const baseUrl = getPublicBaseUrl(req);
+
+    return images.map((img) => {
+        if (img && typeof img === 'object') {
+            const fileName = String(img.fileName || img.originalName || img.url || '').split('/').pop();
+            const originalName = String(img.originalName || fileName || '');
+            const url = String(img.url || '');
+            const normalizedUrl = /^https?:\/\//i.test(url)
+                ? url.replace(/^http:\/\//i, 'https://')
+                : `${baseUrl}/uploads/${fileName}`;
+
+            return {
+                fileName,
+                originalName,
+                url: normalizedUrl
+            };
+        }
+
+        const raw = String(img || '');
+        const fileName = raw.split('/').pop();
+        return {
+            fileName,
+            originalName: fileName,
+            url: `${baseUrl}/uploads/${fileName}`
+        };
     });
 }
 
@@ -216,7 +253,7 @@ app.post('/api/upload', authenticateToken, (req, res) => {
         console.log('[upload] req.file.path:', req.file.path);
         console.log('[upload] req.file.absolutePath:', path.resolve(req.file.path));
 
-        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        const fileUrl = `${getPublicBaseUrl(req)}/uploads/${req.file.filename}`;
         res.json({
             fileName: req.file.filename,
             originalName: req.file.originalname,
@@ -854,7 +891,10 @@ app.get('/api/vendors', authenticateToken, async (req, res) => {
             [userId]
         );
 
-        res.json(result.rows);
+        res.json(result.rows.map((row) => ({
+            ...row,
+            images: normalizeImageList(row.images, req)
+        })));
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -1086,7 +1126,10 @@ app.get('/api/prewed-locations', authenticateToken, async (req, res) => {
             [userId]
         );
 
-        res.json(result.rows);
+        res.json(result.rows.map((row) => ({
+            ...row,
+            images: normalizeImageList(row.images, req)
+        })));
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
