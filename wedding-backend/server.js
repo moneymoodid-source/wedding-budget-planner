@@ -346,7 +346,7 @@ app.post('/api/register', async (req, res) => {
 
                     <div style="margin: 24px 0;">
                         <a 
-                            href="${frontendUrl}?openLogin=true" 
+                            href="${frontendUrl}/login" 
                             style="background-color: #ec4899; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;"
                         >
                             Buka Admin Dashboard
@@ -1287,7 +1287,7 @@ app.post('/api/admin/approve', authenticateToken, requireAdmin, async (req, res)
 
                     <div style="margin: 24px 0;">
                         <a 
-                            href="${frontendUrl}?openLogin=true&logout=true"
+                            href="${frontendUrl}/login"
                             style="background-color: #ec4899; color: #ffffff; padding: 12px 20px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;"
                         >
                             Login ke MoneyMood
