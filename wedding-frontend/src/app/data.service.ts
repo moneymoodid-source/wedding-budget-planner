@@ -404,15 +404,15 @@ export class DataService {
   // ==========================================
   
   uploadFile(file: File): Observable<{ fileName: string; originalName: string; url: string }> {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
   const maxFileSize = 5 * 1024 * 1024; // 5 MB
 
   if (!allowedTypes.includes(file.type)) {
-    return throwError(() => new Error('Format file tidak didukung. Gunakan JPG, PNG, atau WEBP.'));
+    return throwError(() => new Error('Gagal upload karena size image melewati batas maksimal 5MB atau format file tidak sesuai'));
   }
 
   if (file.size > maxFileSize) {
-    return throwError(() => new Error('Ukuran file terlalu besar. Maksimal 5 MB.'));
+    return throwError(() => new Error('Gagal upload karena size image melewati batas maksimal 5MB atau format file tidak sesuai'));
   }
 
   const formData = new FormData();

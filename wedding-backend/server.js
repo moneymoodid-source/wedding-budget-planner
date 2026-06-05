@@ -209,7 +209,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 const maxImageSize = 5 * 1024 * 1024; // 5MB
 
 const upload = multer({
@@ -232,12 +232,12 @@ app.post('/api/upload', authenticateToken, (req, res) => {
 
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return res.status(400).json({
-                    message: 'Ukuran file terlalu besar. Maksimal 5 MB.'
+                    message: 'Gagal upload karena size image melewati batas maksimal 5MB atau format file tidak sesuai'
                 });
             }
 
             return res.status(400).json({
-                message: err.message || 'Gagal mengupload file.'
+                message: 'Gagal upload karena size image melewati batas maksimal 5MB atau format file tidak sesuai'
             });
         }
 
