@@ -3,6 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Router } from '@angular/router';
 import { LottieComponent, AnimationOptions } from 'ngx-lottie';
 
 // --- IMPORT KOMPONEN & SERVICE ---
@@ -43,7 +44,7 @@ export interface PrewedPayload {
 interface MenuItem { id: string; label: string; iconPath: string; }
 
 @Component({
-   selector: 'app-root',
+   selector: 'app-wedding-planner',
    standalone: true,
    imports: [CommonModule, FormsModule, HttpClientModule, LoginComponent, AdminComponent, HomeComponent, LottieComponent],
    providers: [DecimalPipe],
@@ -2429,6 +2430,7 @@ export class App implements OnInit, OnDestroy {
    public authService = inject(AuthService);
    private dataService = inject(DataService);
    private http = inject(HttpClient);
+   private router = inject(Router);
 
    // Identity & Theme
    weddingTitle = signal('The Wedding of Us');
@@ -5484,6 +5486,7 @@ export class App implements OnInit, OnDestroy {
          this.authService.logout();
          this.resetState();
          this.publicPage.set('login');
+         this.router.navigateByUrl('/login');
       }
    }
    autoLogoutByIdle() {
@@ -5497,6 +5500,7 @@ export class App implements OnInit, OnDestroy {
       this.authService.logout();
       this.resetState();
       this.publicPage.set('login');
+      this.router.navigateByUrl('/login');
    }
 }
 

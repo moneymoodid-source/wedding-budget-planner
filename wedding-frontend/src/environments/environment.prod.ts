@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://backend-domain-kamu.com/api'
+  apiUrl: 'https://api.moneymood.id/api'
 };

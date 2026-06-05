@@ -1,6 +1,7 @@
-import { Component, inject, signal, Output, EventEmitter } from '@angular/core';
+import { Component, inject, signal, Output, EventEmitter, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 
 @Component({
@@ -19,7 +20,7 @@ import { AuthService } from '../auth.service';
           <!-- Logo MoneyMood clickable -->
           <button
             type="button"
-            (click)="backHome.emit()"
+            (click)="goHome()"
             class="relative z-10 inline-flex flex-col items-center justify-center group mb-4"
             title="Kembali ke Landing Page MoneyMood"
           >
@@ -169,8 +170,11 @@ import { AuthService } from '../auth.service';
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
+  @Input() mode: 'login' | 'register' | null = null;
   @Output() backHome = new EventEmitter<void>();
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private isValidEmail(email: string): boolean {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -210,14 +214,42 @@ export class LoginComponent {
   showLoginPassword = false;
   showRegisterPassword = false;
 
-  // Ganti Mode Login <-> Register
-  toggleMode() {
-    this.isRegisterMode.update(v => !v);
+  ngOnInit() {
+    this.route.data.subscribe((data) => {
+      const requestedMode = this.mode ?? (data['mode'] as 'login' | 'register' | undefined) ?? 'login';
+      const registeredMessage = sessionStorage.getItem('post_register_message');
+
+      this.syncMode(requestedMode);
+
+      if (requestedMode === 'login' && registeredMessage) {
+        this.successMessage.set(registeredMessage);
+        sessionStorage.removeItem('post_register_message');
+      }
+    });
+  }
+
+  private syncMode(mode: 'login' | 'register') {
+    this.isRegisterMode.set(mode === 'register');
     this.errorMessage.set('');
-    this.successMessage.set('');
+
+    if (mode !== 'login') {
+      this.successMessage.set('');
+    }
 
     this.showLoginPassword = false;
     this.showRegisterPassword = false;
+  }
+
+  goHome() {
+    this.backHome.emit();
+    this.router.navigateByUrl('/landing');
+  }
+
+  // Ganti Mode Login <-> Register
+  toggleMode() {
+    const nextMode = this.isRegisterMode() ? 'login' : 'register';
+    this.syncMode(nextMode);
+    this.router.navigateByUrl(`/${nextMode}`);
   }
 
   // Saat tombol submit ditekan
@@ -286,17 +318,24 @@ export class LoginComponent {
         this.isLoading.set(false);
 
         if (this.isRegisterMode()) {
-          this.successMessage.set(
+          sessionStorage.setItem(
+            'post_register_message',
             'Registrasi berhasil. Silakan tunggu approval admin. Email konfirmasi akan dikirim setelah akun kamu aktif.'
           );
-
-          this.errorMessage.set('');
-          this.isRegisterMode.set(false);
 
           this.username = '';
           this.email = '';
           this.password = '';
+          this.identifier = '';
+          this.errorMessage.set('');
+          this.router.navigateByUrl('/login');
+          return;
         }
+
+        const user = res?.user ?? this.authService.currentUser();
+        const destination = user?.role === 'admin' ? '/admin' : '/wedding-planner';
+
+        this.router.navigateByUrl(destination);
       },
       error: (err) => {
         this.isLoading.set(false);

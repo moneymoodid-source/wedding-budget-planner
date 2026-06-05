@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { environment } from '../../environments/environment';
 
@@ -271,6 +272,7 @@ import { environment } from '../../environments/environment';
 export class AdminComponent implements OnInit {
     http = inject(HttpClient);
     authService = inject(AuthService);
+    router = inject(Router);
 
     users = signal<any[]>([]);
 
@@ -563,6 +565,7 @@ export class AdminComponent implements OnInit {
     logout() {
         if(confirm('Keluar dari Admin Dashboard?')) {
             this.authService.logout();
+            this.router.navigateByUrl('/login');
         }
     }
 }

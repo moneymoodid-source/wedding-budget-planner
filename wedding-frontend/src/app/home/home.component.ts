@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 
 @Component({
@@ -215,7 +216,7 @@ import { environment } from '../../environments/environment';
 
                     <button
                       type="button"
-                      (click)="openLogin.emit()"
+                      (click)="goToLogin()"
                       class="w-full rounded-2xl bg-slate-900 py-4 text-center text-[11px] font-black uppercase tracking-[0.2em] text-white transition-all hover:bg-slate-700 active:scale-95 sm:text-xs sm:tracking-widest"
                     >
                       Sudah Beli? Silahkan Register / Login
@@ -270,6 +271,7 @@ export class HomeComponent implements OnInit {
   @Output() openLogin = new EventEmitter<void>();
 
   private http = inject(HttpClient);
+  private router = inject(Router);
 
   totalUsers = signal<number | null>(null);
 
@@ -307,5 +309,10 @@ export class HomeComponent implements OnInit {
       behavior: 'smooth',
       block: 'start'
     });
+  }
+
+  goToLogin() {
+    this.openLogin.emit();
+    this.router.navigateByUrl('/login');
   }
 }
