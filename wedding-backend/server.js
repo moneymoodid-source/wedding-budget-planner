@@ -209,15 +209,26 @@ const storage = multer.diskStorage({
     }
 });
 
-const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const allowedImageTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/pjpeg',
+    'image/png',
+    'image/webp',
+    'image/heic',
+    'image/heif'
+];
 const maxImageSize = 5 * 1024 * 1024; // 5MB
 
 const upload = multer({
     storage: storage,
     limits: { fileSize: maxImageSize },
     fileFilter: (req, file, cb) => {
-        if (!allowedImageTypes.includes(file.mimetype)) {
-        return cb(new Error('Format file tidak didukung. Gunakan JPG, PNG, atau WEBP.'));
+        const fileName = String(file.originalname || '').toLowerCase();
+        const hasAllowedExtension = /\.(jpe?g|png|webp|heic|heif)$/i.test(fileName);
+
+        if (!allowedImageTypes.includes(file.mimetype) && !hasAllowedExtension) {
+        return cb(new Error('Format file tidak didukung.'));
         }
         cb(null, true);
     }
