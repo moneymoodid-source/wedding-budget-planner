@@ -17,6 +17,7 @@ const uploadsDir = path.join(__dirname, 'uploads');
 const app = express();
 app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
+const sessionIdleLimitMs = Number(process.env.SESSION_IDLE_LIMIT_MS || 30 * 60 * 1000);
 
 if (!process.env.JWT_SECRET) {
     console.error('JWT_SECRET belum diset di file .env');
@@ -90,6 +91,172 @@ function normalizeImageList(images, req) {
     });
 }
 
+async function ensureOwnershipMetadataColumns() {
+    await pool.query(`
+        ALTER TABLE vendors
+        ADD COLUMN IF NOT EXISTS data_origin text DEFAULT 'user',
+        ADD COLUMN IF NOT EXISTS source_user_id integer,
+        ADD COLUMN IF NOT EXISTS source_record_id integer
+    `);
+
+    await pool.query(`
+        ALTER TABLE prewed_locations
+        ADD COLUMN IF NOT EXISTS data_origin text DEFAULT 'user',
+        ADD COLUMN IF NOT EXISTS source_user_id integer,
+        ADD COLUMN IF NOT EXISTS source_record_id integer
+    `);
+
+    await pool.query(`
+        ALTER TABLE vendors_categories
+        ADD COLUMN IF NOT EXISTS data_origin text DEFAULT 'user',
+        ADD COLUMN IF NOT EXISTS source_user_id integer,
+        ADD COLUMN IF NOT EXISTS source_record_id integer
+    `);
+
+    await pool.query(`
+        UPDATE vendors SET data_origin = COALESCE(data_origin, 'user')
+    `);
+    await pool.query(`
+        UPDATE prewed_locations SET data_origin = COALESCE(data_origin, 'user')
+    `);
+    await pool.query(`
+        UPDATE vendors_categories SET data_origin = COALESCE(data_origin, 'user')
+    `);
+}
+
+async function ensureUserActivityColumns() {
+    await pool.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS last_active_at timestamp,
+        ADD COLUMN IF NOT EXISTS last_login_at timestamp
+    `);
+}
+
+async function ensureProtectedUploadsTable() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS protected_uploads (
+            file_name text PRIMARY KEY,
+            protected_reason text NOT NULL DEFAULT 'shared',
+            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            updated_at timestamp DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+}
+
+async function ensurePublicVisitorTable() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS public_visits (
+            visitor_key text PRIMARY KEY,
+            first_visited_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            last_visited_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            visit_count integer DEFAULT 1
+        )
+    `);
+}
+
+async function ensureUserSessionsTable() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id bigserial PRIMARY KEY,
+            user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            started_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            last_seen_at timestamp DEFAULT CURRENT_TIMESTAMP,
+            ended_at timestamp,
+            end_reason text,
+            last_activity_reason text DEFAULT 'login'
+        )
+    `);
+}
+
+async function touchUserActivity(userId, options = {}) {
+    if (!userId) return;
+
+    const {
+        markLogin = false,
+        sessionId = null,
+        activityReason = 'active',
+        endSession = false
+    } = options;
+
+    if (markLogin) {
+        await pool.query(
+            `UPDATE users
+             SET last_active_at = CURRENT_TIMESTAMP,
+                 last_login_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [userId]
+        );
+        return;
+    }
+
+    await pool.query(
+        `UPDATE users
+         SET last_active_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [userId]
+    );
+
+    if (!sessionId) {
+        return;
+    }
+
+    if (endSession) {
+        await pool.query(
+            `UPDATE user_sessions
+             SET last_seen_at = CURRENT_TIMESTAMP,
+                 ended_at = CURRENT_TIMESTAMP,
+                 end_reason = $1,
+                 last_activity_reason = $1
+             WHERE id = $2 AND user_id = $3 AND ended_at IS NULL`,
+            [activityReason, sessionId, userId]
+        );
+        return;
+    }
+
+    await pool.query(
+        `UPDATE user_sessions
+         SET last_seen_at = CURRENT_TIMESTAMP,
+             last_activity_reason = $1
+         WHERE id = $2 AND user_id = $3 AND ended_at IS NULL`,
+        [activityReason, sessionId, userId]
+    );
+}
+
+function getLatestUserActivityDate(userRow) {
+    const activityCandidates = [
+        userRow?.last_active_at,
+        userRow?.last_login_at,
+        userRow?.created_at
+    ].filter(Boolean);
+
+    if (activityCandidates.length === 0) {
+        return null;
+    }
+
+    const timestamps = activityCandidates
+        .map((value) => new Date(value))
+        .filter((date) => !Number.isNaN(date.getTime()))
+        .map((date) => date.getTime());
+
+    if (timestamps.length === 0) {
+        return null;
+    }
+
+    return new Date(Math.max(...timestamps));
+}
+
+function verifyJwtToken(token) {
+    return new Promise((resolve, reject) => {
+        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(decoded);
+        });
+    });
+}
+
 function normalizeUploadFileName(fileNameOrUrl) {
     if (!fileNameOrUrl) return null;
     return path.basename(String(fileNameOrUrl).split('?')[0]);
@@ -117,8 +284,29 @@ async function shouldDeleteUnusedFile(fileName, db = pool) {
     const normalizedFileName = normalizeUploadFileName(fileName);
     if (!normalizedFileName) return null;
 
+    const protectedResult = await db.query(
+        `SELECT 1 FROM protected_uploads WHERE file_name = $1`,
+        [normalizedFileName]
+    );
+    if (protectedResult.rows.length > 0) {
+        return null;
+    }
+
     const stillReferenced = await isFileStillReferenced(normalizedFileName, db);
     return stillReferenced ? null : normalizedFileName;
+}
+
+async function protectUploadFile(fileName, reason = 'shared') {
+    const normalizedFileName = normalizeUploadFileName(fileName);
+    if (!normalizedFileName) return;
+
+    await pool.query(
+        `INSERT INTO protected_uploads (file_name, protected_reason, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (file_name)
+         DO UPDATE SET protected_reason = EXCLUDED.protected_reason, updated_at = CURRENT_TIMESTAMP`,
+        [normalizedFileName, reason]
+    );
 }
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
@@ -167,7 +355,7 @@ async function sendEmail({ to, subject, html }) {
 // ==========================================
 // JWT MIDDLEWARE
 // ==========================================
-function authenticateToken(req, res, next) {
+async function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -175,14 +363,100 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ message: 'Token tidak ditemukan.' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ message: 'Sesi login kamu sudah berakhir. Silakan login ulang untuk melanjutkan.' });
+    try {
+        const user = await verifyJwtToken(token);
+        const hasSessionId = Boolean(user.sid);
+        const userResult = await pool.query(
+            hasSessionId
+                ? `SELECT
+                       u.id,
+                       u.username,
+                       u.role,
+                       u.status,
+                       u.created_at,
+                       u.last_active_at,
+                       u.last_login_at,
+                       s.id AS session_id,
+                       s.started_at,
+                       s.last_seen_at,
+                       s.ended_at
+                   FROM users u
+                   LEFT JOIN user_sessions s
+                     ON s.id = $2
+                    AND s.user_id = u.id
+                   WHERE u.id = $1`
+                : `SELECT
+                       id,
+                       username,
+                       role,
+                       status,
+                       created_at,
+                       last_active_at,
+                       last_login_at
+                   FROM users
+                   WHERE id = $1`,
+            hasSessionId ? [user.id, user.sid] : [user.id]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(401).json({ message: 'User tidak ditemukan.' });
         }
 
-        req.user = user;
+        const dbUser = userResult.rows[0];
+        if (hasSessionId && !dbUser.session_id) {
+            return res.status(401).json({
+                error: 'SESSION_INVALID',
+                message: 'Sesi login tidak lagi valid. Silakan login ulang.'
+            });
+        }
+
+        if (hasSessionId && dbUser.ended_at) {
+            return res.status(401).json({
+                error: 'SESSION_ENDED',
+                message: 'Sesi login sudah berakhir. Silakan login ulang.'
+            });
+        }
+
+        const latestActivity = dbUser.last_seen_at
+            ? new Date(dbUser.last_seen_at)
+            : getLatestUserActivityDate(dbUser);
+
+        if (latestActivity && Date.now() - latestActivity.getTime() > sessionIdleLimitMs) {
+            if (dbUser.session_id) {
+                await touchUserActivity(dbUser.id, {
+                    sessionId: dbUser.session_id,
+                    activityReason: 'idle-timeout',
+                    endSession: true
+                });
+            }
+            return res.status(401).json({
+                error: 'SESSION_IDLE_EXPIRED',
+                message: 'Sesi login berakhir karena tidak ada aktivitas terlalu lama. Silakan login ulang.'
+            });
+        }
+
+        req.user = {
+            id: dbUser.id,
+            username: dbUser.username,
+            role: dbUser.role,
+            status: dbUser.status,
+            sid: dbUser.session_id || user.sid || null
+        };
+
+        touchUserActivity(dbUser.id, {
+            sessionId: dbUser.session_id || user.sid || null,
+            activityReason: 'authenticated-request'
+        }).catch((activityErr) => {
+            console.error('Gagal update last_active_at:', activityErr.message);
+        });
         next();
-    });
+    } catch (err) {
+        if (err?.name === 'TokenExpiredError' || err?.name === 'JsonWebTokenError') {
+            return res.status(403).json({ message: 'Sesi login kamu sudah berakhir. Silakan login ulang untuk melanjutkan.' });
+        }
+        console.error('authenticateToken error:', err.message || err);
+        return res.status(500).json({ message: 'Gagal memverifikasi sesi login.' });
+    }
 }
 
 function requireAdmin(req, res, next) {
@@ -196,6 +470,76 @@ function requireAdmin(req, res, next) {
 function getUserIdFromToken(req) {
     return req.user.id;
 }
+
+app.post('/api/me/activity', authenticateToken, async (req, res) => {
+    try {
+        const userId = getUserIdFromToken(req);
+        await touchUserActivity(userId, {
+            sessionId: req.user?.sid || null,
+            activityReason: req.body?.reason || 'active'
+        });
+        res.json({ message: 'Aktivitas user diperbarui.' });
+    } catch (err) {
+        console.error('Gagal touch activity manual:', err.message);
+        res.status(500).json({ message: 'Gagal memperbarui aktivitas user.' });
+    }
+});
+
+app.post('/api/me/logout', authenticateToken, async (req, res) => {
+    try {
+        const userId = getUserIdFromToken(req);
+        await touchUserActivity(userId, {
+            sessionId: req.user?.sid || null,
+            activityReason: req.body?.reason || 'manual',
+            endSession: true
+        });
+        res.json({ message: 'Sesi login ditutup.' });
+    } catch (err) {
+        console.error('Gagal logout sesi user:', err.message);
+        res.status(500).json({ message: 'Gagal menutup sesi login.' });
+    }
+});
+
+app.get('/api/me/session', authenticateToken, async (req, res) => {
+    try {
+        const userId = getUserIdFromToken(req);
+        const userResult = await pool.query(
+            `SELECT id, username, role
+             FROM users
+             WHERE id = $1`,
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(401).json({ message: 'User tidak ditemukan.' });
+        }
+
+        const user = userResult.rows[0];
+
+        let theme_id = 'gold';
+        const detailsResult = await pool.query(
+            'SELECT theme_id FROM wedding_details WHERE user_id = $1',
+            [user.id]
+        );
+
+        if (detailsResult.rows.length > 0 && detailsResult.rows[0].theme_id) {
+            theme_id = detailsResult.rows[0].theme_id;
+        }
+
+        res.json({
+            valid: true,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                theme_id
+            }
+        });
+    } catch (err) {
+        console.error('Gagal validasi sesi login:', err.message);
+        res.status(500).json({ message: 'Gagal memvalidasi sesi login.' });
+    }
+});
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -452,15 +796,31 @@ app.post('/api/login', async (req, res) => {
             theme_id = detailsResult.rows[0].theme_id;
         }
 
+        const sessionInsert = await pool.query(
+            `INSERT INTO user_sessions (user_id, last_seen_at, last_activity_reason)
+             VALUES ($1, CURRENT_TIMESTAMP, 'login')
+             RETURNING id`,
+            [user.id]
+        );
+
+        const sessionId = sessionInsert.rows[0].id;
+
         const token = jwt.sign(
             {
                 id: user.id,
                 username: user.username,
-                role: user.role
+                role: user.role,
+                sid: sessionId
             },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+        await touchUserActivity(user.id, {
+            markLogin: true,
+            sessionId,
+            activityReason: 'login'
+        });
 
         res.json({ 
             message: "Login Berhasil",
@@ -484,6 +844,21 @@ app.post('/api/login', async (req, res) => {
 // ==========================================
 ensureWeddingDetailsHeaderPositionColumns().catch((err) => {
     console.error('Gagal memastikan kolom posisi header image:', err);
+});
+ensureOwnershipMetadataColumns().catch((err) => {
+    console.error('Gagal memastikan metadata kepemilikan data:', err);
+});
+ensureUserActivityColumns().catch((err) => {
+    console.error('Gagal memastikan kolom aktivitas user:', err);
+});
+ensureUserSessionsTable().catch((err) => {
+    console.error('Gagal memastikan tabel user sessions:', err);
+});
+ensureProtectedUploadsTable().catch((err) => {
+    console.error('Gagal memastikan tabel protected uploads:', err);
+});
+ensurePublicVisitorTable().catch((err) => {
+    console.error('Gagal memastikan tabel public visits:', err);
 });
 
 app.get('/api/themes', async (req, res) => {
@@ -933,7 +1308,10 @@ app.post('/api/vendors', authenticateToken, async (req, res) => {
     const { name, category, location, social_link, images, price } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO vendors (user_id, name, category, location, social_link, images, price) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            `INSERT INTO vendors
+             (user_id, name, category, location, social_link, images, price, data_origin)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'user')
+             RETURNING *`,
             [userId, name, category, location, social_link, images, price] // images harus berupa array []
         );
         res.json(result.rows[0]);
@@ -990,9 +1368,9 @@ app.post('/api/vendors-categories', authenticateToken, async (req, res) => {
         }
 
         const result = await pool.query(
-            `INSERT INTO vendors_categories (user_id, name, is_main_checklist)
-             VALUES ($1, $2, FALSE)
-             RETURNING id, user_id, name, is_main_checklist`,
+            `INSERT INTO vendors_categories (user_id, name, is_main_checklist, data_origin)
+             VALUES ($1, $2, FALSE, 'user')
+             RETURNING id, user_id, name, is_main_checklist, data_origin, source_user_id, source_record_id`,
             [userId, normalizedName]
         );
 
@@ -1153,8 +1531,8 @@ app.post('/api/prewed-locations', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(
             `INSERT INTO prewed_locations 
-             (user_id, name, location_name, maps_link, note, price, images) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) 
+             (user_id, name, location_name, maps_link, note, price, images, data_origin) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'user') 
              RETURNING *`,
             [
                 userId,
@@ -1292,7 +1670,33 @@ app.delete('/api/prewed-locations/:id', authenticateToken, async (req, res) => {
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const users = await pool.query(
-            'SELECT id, username, email, role, status, created_at FROM users ORDER BY created_at DESC'
+            `SELECT
+                u.id,
+                u.username,
+                u.email,
+                u.role,
+                u.status,
+                u.created_at,
+                u.last_active_at,
+                u.last_login_at,
+                GREATEST(
+                    COALESCE(MAX(s.last_seen_at), u.created_at),
+                    COALESCE(u.last_active_at, u.created_at),
+                    COALESCE(u.last_login_at, u.created_at)
+                ) AS last_active
+             FROM users u
+             LEFT JOIN user_sessions s
+               ON s.user_id = u.id
+             GROUP BY
+                u.id,
+                u.username,
+                u.email,
+                u.role,
+                u.status,
+                u.created_at,
+                u.last_active_at,
+                u.last_login_at
+             ORDER BY u.created_at DESC`
         );
 
         res.json(users.rows);
@@ -1486,7 +1890,7 @@ app.post('/api/admin/duplicate-vendors', authenticateToken, requireAdmin, async 
 
         // 3. Ambil vendor dari akun sumber
         const sourceVendors = await client.query(
-            `SELECT name, category, location, social_link, images, price
+            `SELECT id, name, category, location, social_link, images, price
              FROM vendors
              WHERE user_id = $1
              ORDER BY id ASC`,
@@ -1502,7 +1906,7 @@ app.post('/api/admin/duplicate-vendors', authenticateToken, requireAdmin, async 
 
         // 4. Ambil kategori vendor dari akun sumber
         const sourceCategories = await client.query(
-            `SELECT name, is_main_checklist
+            `SELECT id, name, is_main_checklist
             FROM vendors_categories 
             WHERE user_id = $1 
             ORDER BY id ASC`,
@@ -1521,20 +1925,29 @@ app.post('/api/admin/duplicate-vendors', authenticateToken, requireAdmin, async 
             // Copy kategori vendor dulu
             for (const cat of sourceCategories.rows) {
                 const insertedCategory = await client.query(
-                    `INSERT INTO vendors_categories (user_id, name, is_main_checklist)
-                    SELECT v.user_id, v.name, v.is_main_checklist
-                    FROM (VALUES ($1::int, $2::varchar, $3::boolean)) AS v(user_id, name, is_main_checklist)
+                    `INSERT INTO vendors_categories (user_id, name, is_main_checklist, data_origin, source_user_id, source_record_id)
+                    SELECT v.user_id, v.name, v.is_main_checklist, 'injected', $4::int, $5::int
+                    FROM (VALUES ($1::int, $2::varchar, $3::boolean, $4::int, $5::int)) AS v(user_id, name, is_main_checklist, source_user_id, source_record_id)
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM vendors_categories vc
                         WHERE vc.user_id = v.user_id
-                        AND LOWER(TRIM(vc.name)) = LOWER(TRIM(v.name))
+                        AND (
+                            (vc.source_user_id = v.source_user_id AND vc.source_record_id = v.source_record_id)
+                            OR (
+                                vc.source_user_id IS NULL
+                                AND vc.source_record_id IS NULL
+                                AND LOWER(TRIM(vc.name)) = LOWER(TRIM(v.name))
+                            )
+                        )
                     )
                     RETURNING id`,
                     [
                         Number(targetUserId),
                         String(cat.name || ''),
-                        Boolean(cat.is_main_checklist)
+                        Boolean(cat.is_main_checklist),
+                        Number(sourceUserId),
+                        Number(cat.id)
                     ]
                 );
 
@@ -1547,16 +1960,26 @@ app.post('/api/admin/duplicate-vendors', authenticateToken, requireAdmin, async 
 
             // Copy vendor
             for (const vendor of sourceVendors.rows) {
+                for (const image of (vendor.images || [])) {
+                    await protectUploadFile(image, 'shared_vendor_image');
+                }
                 const insertedVendor = await client.query(
                     `INSERT INTO vendors 
-                    (user_id, name, category, location, social_link, images, price, selected)
-                    SELECT $1::int, $2::varchar, $3::varchar, $4::text, $5::text, $6, $7::numeric, false
+                    (user_id, name, category, location, social_link, images, price, selected, data_origin, source_user_id, source_record_id)
+                    SELECT $1::int, $2::varchar, $3::varchar, $4::text, $5::text, $6, $7::numeric, false, 'injected', $8::int, $9::int
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM vendors
                         WHERE user_id = $1::int
-                        AND LOWER(TRIM(name)) = LOWER(TRIM($2::varchar))
-                        AND LOWER(TRIM(category)) = LOWER(TRIM($3::varchar))
+                        AND (
+                            (source_user_id = $8::int AND source_record_id = $9::int)
+                            OR (
+                                source_user_id IS NULL
+                                AND source_record_id IS NULL
+                                AND LOWER(TRIM(name)) = LOWER(TRIM($2::varchar))
+                                AND LOWER(TRIM(category)) = LOWER(TRIM($3::varchar))
+                            )
+                        )
                     )
                     RETURNING id`,
                     [
@@ -1566,7 +1989,9 @@ app.post('/api/admin/duplicate-vendors', authenticateToken, requireAdmin, async 
                         vendor.location || '',
                         vendor.social_link || '',
                         vendor.images || [],
-                        Number(vendor.price || 0)
+                        Number(vendor.price || 0),
+                        Number(sourceUserId),
+                        Number(vendor.id)
                     ]
                 );
 
@@ -1653,7 +2078,7 @@ app.post('/api/admin/duplicate-prewed-locations', authenticateToken, requireAdmi
 
         // 3. Ambil lokasi prewed dari akun sumber
         const sourcePrewedLocations = await client.query(
-            `SELECT name, location_name, maps_link, note, price, images
+            `SELECT id, name, location_name, maps_link, note, price, images
              FROM prewed_locations
              WHERE user_id = $1::int
              ORDER BY id ASC`,
@@ -1675,9 +2100,12 @@ app.post('/api/admin/duplicate-prewed-locations', authenticateToken, requireAdmi
             const targetUserId = Number(target.id);
 
             for (const loc of sourcePrewedLocations.rows) {
+                for (const image of (loc.images || [])) {
+                    await protectUploadFile(image, 'shared_prewed_image');
+                }
                 const insertedLocation = await client.query(
                     `INSERT INTO prewed_locations
-                    (user_id, name, location_name, maps_link, note, price, images, selected)
+                    (user_id, name, location_name, maps_link, note, price, images, selected, data_origin, source_user_id, source_record_id)
                     SELECT 
                         $1::int,
                         $2::varchar,
@@ -1686,13 +2114,23 @@ app.post('/api/admin/duplicate-prewed-locations', authenticateToken, requireAdmi
                         $5::text,
                         $6::numeric,
                         $7::text[],
-                        false
+                        false,
+                        'injected',
+                        $8::int,
+                        $9::int
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM prewed_locations
                         WHERE user_id = $1::int
-                        AND LOWER(TRIM(name)) = LOWER(TRIM($2::varchar))
-                        AND LOWER(TRIM(location_name)) = LOWER(TRIM($3::varchar))
+                        AND (
+                            (source_user_id = $8::int AND source_record_id = $9::int)
+                            OR (
+                                source_user_id IS NULL
+                                AND source_record_id IS NULL
+                                AND LOWER(TRIM(name)) = LOWER(TRIM($2::varchar))
+                                AND LOWER(TRIM(location_name)) = LOWER(TRIM($3::varchar))
+                            )
+                        )
                     )
                     RETURNING id`,
                     [
@@ -1702,7 +2140,9 @@ app.post('/api/admin/duplicate-prewed-locations', authenticateToken, requireAdmi
                         loc.maps_link || '',
                         loc.note || '',
                         Number(loc.price || 0),
-                        loc.images || []
+                        loc.images || [],
+                        Number(normalizedSourceUserId),
+                        Number(loc.id)
                     ]
                 );
 
@@ -1749,13 +2189,46 @@ app.get('/api/public/stats', async (req, res) => {
              AND status = 'approved'`
         );
 
+        const visitorCountResult = await pool.query(
+            `SELECT COALESCE(SUM(visit_count), 0)::int AS total_visits
+             FROM public_visits`
+        );
+
         res.json({
-            totalUsers: userCountResult.rows[0].total_users
+            totalUsers: userCountResult.rows[0].total_users,
+            totalVisits: visitorCountResult.rows[0].total_visits
         });
     } catch (err) {
         console.error('Public stats error:', err);
         res.status(500).json({
             message: 'Gagal mengambil statistik publik.'
+        });
+    }
+});
+
+app.post('/api/public/visit', async (req, res) => {
+    try {
+        const visitorKey = String(req.body?.visitorKey || '').trim();
+
+        if (!visitorKey) {
+            return res.status(400).json({ message: 'visitorKey wajib diisi.' });
+        }
+
+        await pool.query(
+            `INSERT INTO public_visits (visitor_key, first_visited_at, last_visited_at, visit_count)
+             VALUES ($1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+             ON CONFLICT (visitor_key)
+             DO UPDATE SET
+                last_visited_at = CURRENT_TIMESTAMP,
+                visit_count = public_visits.visit_count + 1`,
+            [visitorKey]
+        );
+
+        res.json({ message: 'Visit tercatat.' });
+    } catch (err) {
+        console.error('Public visit error:', err);
+        res.status(500).json({
+            message: 'Gagal mencatat visit publik.'
         });
     }
 });

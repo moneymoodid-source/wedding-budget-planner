@@ -64,6 +64,9 @@ export interface Todo {
 export interface Vendor {
   id?: number;
   user_id?: number;
+  data_origin?: 'user' | 'injected';
+  source_user_id?: number | null;
+  source_record_id?: number | null;
   name: string;
   category: string;
   location: string;
@@ -87,6 +90,9 @@ export interface VendorAPIPayload {
 export interface VendorCategory { 
   id: number;
   user_id?: number;
+  data_origin?: 'user' | 'injected';
+  source_user_id?: number | null;
+  source_record_id?: number | null;
   name: string;
   is_main_checklist?: boolean;
 }
@@ -94,6 +100,9 @@ export interface VendorCategory {
 export interface PrewedLocation { 
   id?: number;
   user_id?: number;
+  data_origin?: 'user' | 'injected';
+  source_user_id?: number | null;
+  source_record_id?: number | null;
   name: string;
   location_name: string;
   maps_link: string;

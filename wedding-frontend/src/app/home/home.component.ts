@@ -282,10 +282,11 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     this.loadPublicStats();
+    this.recordPublicVisit();
   }
 
   loadPublicStats() {
-    this.http.get<{ totalUsers: number }>(`${environment.apiUrl}/public/stats`)
+    this.http.get<{ totalUsers: number; totalVisits: number }>(`${environment.apiUrl}/public/stats`)
       .subscribe({
         next: (res) => {
           this.totalUsers.set(res.totalUsers || 0);
@@ -295,6 +296,21 @@ export class HomeComponent implements OnInit {
           this.totalUsers.set(null);
         }
       });
+  }
+
+  recordPublicVisit() {
+    let visitorKey = localStorage.getItem('moneymood_visitor_key');
+
+    if (!visitorKey) {
+      visitorKey = crypto.randomUUID();
+      localStorage.setItem('moneymood_visitor_key', visitorKey);
+    }
+
+    this.http.post(`${environment.apiUrl}/public/visit`, { visitorKey }).subscribe({
+      error: (err) => {
+        console.error('Gagal mencatat public visit:', err);
+      }
+    });
   }
 
   openWhatsAppAdmin() {

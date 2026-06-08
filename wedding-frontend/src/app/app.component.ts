@@ -1783,7 +1783,7 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                               <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                  @for (vendor of paginatedVendors(); track vendor.id) {
                                     <div 
-                                       class="bg-white rounded-[2rem] shadow-md border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col relative"
+                                       class="bg-white rounded-[2rem] shadow-md border border-slate-100 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col relative min-w-0"
                                        [class.ring-4]="editingVendorId() === vendor.id"
                                        [class.ring-2]="vendor.selected && editingVendorId() !== vendor.id"
                                        [class.ring-offset-4]="editingVendorId() === vendor.id"
@@ -1794,7 +1794,7 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                     >
                                        <div *ngIf="vendor.selected" class="absolute top-0 right-0 z-20 bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm">✓ Terpilih</div>
 
-                                       <div class="w-full h-48 bg-slate-100 relative group/slider overflow-hidden">
+                                       <div class="w-full h-44 sm:h-48 bg-slate-100 relative group/slider overflow-hidden">
             
                                           @if (vendor.images && vendor.images.length > 0) {
                                              
@@ -1842,33 +1842,33 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                           }
                                        </div>
 
-                                       <div class="p-4 flex flex-col flex-1">
-                                          <div class="flex justify-between items-start mb-2">
-                                             <div>
+                                       <div class="p-4 sm:p-5 flex flex-col flex-1 min-w-0">
+                                          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-2">
+                                             <div class="min-w-0 flex-1">
                                                 <span class="inline-block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">{{ vendor.category }}</span>
-                                                <h4 class="font-bold text-slate-800 text-lg leading-tight">{{ vendor.name }}</h4>
+                                                <h4 class="font-bold text-slate-800 text-lg leading-tight break-words">{{ vendor.name }}</h4>
                                              </div>
-                                             <div class="flex gap-1">
+                                             <div class="flex gap-1 shrink-0 self-start">
                                                 <button (click)="editVendor(vendor)" class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" title="Edit">✎</button>
                                                 <button (click)="deleteVendor(vendor.id!)" class="w-7 h-7 rounded-full bg-slate-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Hapus">×</button>
                                              </div>
                                           </div>
 
-                                          <div class="space-y-1 mb-4 flex-1">
+                                          <div class="space-y-1 mb-4 flex-1 min-w-0">
                                              <p class="text-xs text-slate-500 font-bold flex items-center gap-1">
                                                 <span class="text-slate-400">📍</span> {{ vendor.location || '-' }}
                                              </p>
                                              @if (vendor.social_link) { 
-                                                <div class="text-xs truncate text-blue-500 font-bold hover:underline cursor-pointer flex items-center gap-1">
+                                                <div class="text-xs text-blue-500 font-bold hover:underline cursor-pointer flex items-start gap-1 break-words">
                                                    <span class="text-slate-400">🔗</span> <span [innerHTML]="linkify(vendor.social_link)"></span>
                                                 </div> 
                                              }
                                           </div>
 
                                           <div class="pt-3 border-t border-slate-50 mt-auto">
-                                             <div class="flex justify-between items-end mb-3">
+                                             <div class="flex justify-between items-end gap-3 mb-3">
                                                 <span class="text-[10px] font-bold text-slate-400">Harga / Paket</span>
-                                                <p class="text-lg font-black" [style.color]="currentTheme().color">
+                                                <p class="text-base sm:text-lg font-black text-right" [style.color]="currentTheme().color">
                                                    Rp {{ vendor.price | number:'1.0-0' }}
                                                 </p>
                                              </div>
@@ -2060,10 +2060,10 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                            </div>
 
                            <div class="w-full md:col-span-7 lg:col-span-8 space-y-4 mt-6 md:mt-0">
-                              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
                                  @for (loc of paginatedPrewedLocations(); track loc.id) {
                                     <div 
-                                       class="bg-white rounded-[2rem] shadow-md border border-slate-100 overflow-hidden group/slider hover:shadow-xl transition-all duration-300 flex flex-col h-full relative"
+                                       class="bg-white rounded-[2rem] shadow-md border border-slate-100 overflow-hidden group/slider hover:shadow-xl transition-all duration-300 flex flex-col h-full relative min-w-0"
                                        [class.ring-4]="editingPrewedId() === loc.id"
                                        [class.ring-2]="loc.selected && editingPrewedId() !== loc.id"
                                        [class.ring-offset-4]="editingPrewedId() === loc.id"
@@ -2077,7 +2077,7 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                     </div>
 
                                     <!-- IMAGE DI ATAS -->
-                                    <div class="w-full h-64 bg-slate-100 relative group/controls overflow-hidden">
+                                    <div class="w-full h-56 sm:h-64 bg-slate-100 relative group/controls overflow-hidden">
                                        @if (loc.images && loc.images.length > 0) {
                                           <div 
                                           class="flex h-full w-full transition-transform duration-700 ease-in-out" 
@@ -2126,18 +2126,18 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                     </div>
 
                                     <!-- DETAIL DI BAWAH -->
-                                    <div class="p-4 flex flex-col flex-1">
-                                       <div class="flex justify-between items-start mb-2">
-                                          <div>
+                                    <div class="p-4 sm:p-5 flex flex-col flex-1 min-w-0">
+                                       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-2">
+                                          <div class="min-w-0 flex-1">
                                           <span class="inline-block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">
                                              Lokasi Prewed
                                           </span>
-                                          <h4 class="font-bold text-slate-800 text-lg leading-tight">
+                                          <h4 class="font-bold text-slate-800 text-lg leading-tight break-words">
                                              {{ loc.name }}
                                           </h4>
                                           </div>
 
-                                          <div class="flex gap-1">
+                                          <div class="flex gap-1 shrink-0 self-start">
                                           <button 
                                              (click)="editPrewed(loc)" 
                                              class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" 
@@ -2154,7 +2154,7 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                           </div>
                                        </div>
 
-                                       <div class="space-y-1 mb-4 flex-1">
+                                       <div class="space-y-1 mb-4 flex-1 min-w-0">
                                           <p class="text-xs text-slate-500 font-bold flex items-center gap-1">
                                           <span class="text-slate-400">📍</span> {{ loc.location_name || '-' }}
                                           </p>
@@ -2163,7 +2163,7 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                           <a 
                                              [href]="loc.maps_link" 
                                              target="_blank" 
-                                             class="inline-flex items-center gap-1 text-xs truncate text-blue-500 font-bold hover:underline">
+                                             class="inline-flex items-start gap-1 text-xs text-blue-500 font-bold hover:underline break-words">
                                              <span class="text-slate-400">🗺️</span> Buka di Maps
                                           </a>
                                           }
@@ -2191,9 +2191,9 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                        </div>
 
                                        <div class="pt-3 border-t border-slate-50 mt-auto">
-                                          <div class="flex justify-between items-end mb-3">
+                                          <div class="flex justify-between items-end gap-3 mb-3">
                                           <span class="text-[10px] font-bold text-slate-400">Harga Sewa</span>
-                                          <p class="text-lg font-black" [style.color]="currentTheme().color">
+                                          <p class="text-base sm:text-lg font-black text-right" [style.color]="currentTheme().color">
                                              Rp {{ loc.price | number:'1.0-0' }}
                                           </p>
                                           </div>
@@ -2781,6 +2781,7 @@ export class App implements OnInit, OnDestroy {
    @HostListener('window:keydown', ['$event'])
    handleKeyboardEvent(event: KeyboardEvent) {
       // aktivitas keyboard tetap reset idle timer
+      this.authService.notifyUserActivity();
       this.resetIdleTimer();
 
       const isLightboxOpen = this.lightboxVendor() || this.lightboxPrewed();
@@ -3418,6 +3419,7 @@ export class App implements OnInit, OnDestroy {
    @HostListener('window:scroll')
    @HostListener('window:touchstart')
    onUserActivity() {
+      this.authService.notifyUserActivity();
       this.resetIdleTimer();
    }
    

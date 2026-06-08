@@ -12,32 +12,36 @@ function getPostLoginUrl(authService: AuthService): string {
   return user.role === 'admin' ? '/admin' : '/wedding-planner';
 }
 
-export const guestOnlyGuard: CanActivateFn = () => {
+export const guestOnlyGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  if (authService.currentUser()) {
+  const user = await authService.ensureSessionResolved();
+
+  if (user) {
     return router.createUrlTree([getPostLoginUrl(authService)]);
   }
 
   return true;
 };
 
-export const authGuard: CanActivateFn = () => {
+export const authGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  if (!authService.currentUser()) {
+  const user = await authService.ensureSessionResolved();
+
+  if (!user) {
     return router.createUrlTree(['/login']);
   }
 
   return true;
 };
 
-export const adminGuard: CanActivateFn = () => {
+export const adminGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const user = authService.currentUser();
+  const user = await authService.ensureSessionResolved();
 
   if (!user) {
     return router.createUrlTree(['/login']);
@@ -50,10 +54,10 @@ export const adminGuard: CanActivateFn = () => {
   return true;
 };
 
-export const plannerGuard: CanActivateFn = () => {
+export const plannerGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const user = authService.currentUser();
+  const user = await authService.ensureSessionResolved();
 
   if (!user) {
     return router.createUrlTree(['/login']);
