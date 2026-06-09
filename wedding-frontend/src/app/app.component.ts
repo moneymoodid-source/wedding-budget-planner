@@ -1843,12 +1843,18 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                                        </div>
 
                                        <div class="p-4 sm:p-5 flex flex-col flex-1 min-w-0">
-                                          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-2">
+                                          <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                                              <div class="min-w-0 flex-1">
-                                                <span class="inline-block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">{{ vendor.category }}</span>
-                                                <h4 class="font-bold text-slate-800 text-lg leading-tight break-words">{{ vendor.name }}</h4>
+                                                <div class="mb-1 flex items-center justify-between gap-3">
+                                                   <span class="inline-block text-[9px] font-black uppercase tracking-wider text-slate-400">{{ vendor.category }}</span>
+                                                   <div class="flex shrink-0 gap-1 sm:hidden">
+                                                      <button (click)="editVendor(vendor)" class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" title="Edit">✎</button>
+                                                      <button (click)="deleteVendor(vendor.id!)" class="w-7 h-7 rounded-full bg-slate-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Hapus">×</button>
+                                                   </div>
+                                                </div>
+                                                <h4 class="font-bold text-slate-800 text-base leading-snug sm:text-lg sm:leading-tight sm:pr-2">{{ vendor.name }}</h4>
                                              </div>
-                                             <div class="flex gap-1 shrink-0 self-start">
+                                             <div class="hidden gap-1 sm:flex sm:justify-end sm:shrink-0 sm:self-start">
                                                 <button (click)="editVendor(vendor)" class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" title="Edit">✎</button>
                                                 <button (click)="deleteVendor(vendor.id!)" class="w-7 h-7 rounded-full bg-slate-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" title="Hapus">×</button>
                                              </div>
@@ -2127,30 +2133,47 @@ interface MenuItem { id: string; label: string; iconPath: string; }
 
                                     <!-- DETAIL DI BAWAH -->
                                     <div class="p-4 sm:p-5 flex flex-col flex-1 min-w-0">
-                                       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-2">
+                                       <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                                           <div class="min-w-0 flex-1">
-                                          <span class="inline-block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                                             Lokasi Prewed
-                                          </span>
-                                          <h4 class="font-bold text-slate-800 text-lg leading-tight break-words">
-                                             {{ loc.name }}
-                                          </h4>
+                                             <div class="mb-1 flex items-center justify-between gap-3">
+                                                <span class="inline-block text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                                   Lokasi Prewed
+                                                </span>
+                                                <div class="flex shrink-0 gap-1 sm:hidden">
+                                                   <button 
+                                                      (click)="editPrewed(loc)" 
+                                                      class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" 
+                                                      title="Edit">
+                                                      ✎
+                                                   </button>
+
+                                                   <button 
+                                                      (click)="deletePrewed(loc.id!)" 
+                                                      class="w-7 h-7 rounded-full bg-slate-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" 
+                                                      title="Hapus">
+                                                      ×
+                                                   </button>
+                                                </div>
+                                             </div>
+                                             <h4 class="font-bold text-slate-800 text-base leading-snug sm:text-lg sm:leading-tight sm:pr-2">
+                                                {{ loc.name }}
+                                             </h4>
                                           </div>
 
-                                          <div class="flex gap-1 shrink-0 self-start">
-                                          <button 
-                                             (click)="editPrewed(loc)" 
-                                             class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" 
-                                             title="Edit">
-                                             ✎
-                                          </button>
+                                          <div class="hidden gap-1 sm:flex sm:shrink-0 sm:self-start">
+                                             <button 
+                                                (click)="editPrewed(loc)" 
+                                                class="w-7 h-7 rounded-full bg-slate-50 text-blue-500 hover:bg-blue-50 flex items-center justify-center transition-colors" 
+                                                title="Edit">
+                                                ✎
+                                             </button>
 
-                                          <button 
-                                             (click)="deletePrewed(loc.id!)" 
-                                             class="w-7 h-7 rounded-full bg-slate-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" 
-                                             title="Hapus">
-                                             ×
-                                          </button>
+                                             <button 
+                                                (click)="deletePrewed(loc.id!)" 
+                                                class="w-7 h-7 rounded-full bg-slate-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors" 
+                                                title="Hapus">
+                                                ×
+                                             </button>
                                           </div>
                                        </div>
 
