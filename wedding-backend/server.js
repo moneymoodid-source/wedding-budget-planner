@@ -39,6 +39,46 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
+const USERNAME_REGEX = /^(?!.*\s)[a-zA-Z0-9._-]{3,20}$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
+
+function validateUsername(username) {
+    if (!username) {
+        return 'Username wajib diisi.';
+    }
+
+    if (!USERNAME_REGEX.test(username)) {
+        return 'Username harus 3-20 karakter, tanpa spasi, dan hanya boleh huruf, angka, titik, underscore, atau dash.';
+    }
+
+    return null;
+}
+
+function validateEmail(email) {
+    if (!email) {
+        return 'Email wajib diisi.';
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+        return 'Format email tidak valid.';
+    }
+
+    return null;
+}
+
+function validatePassword(password) {
+    if (!password) {
+        return 'Password wajib diisi.';
+    }
+
+    if (!PASSWORD_REGEX.test(password)) {
+        return 'Password minimal 8 karakter dan harus mengandung huruf besar, huruf kecil, serta angka.';
+    }
+
+    return null;
+}
+
 function deleteFile(filePath) {
     const absolutePath = path.resolve(filePath);
     console.log('[deleteFile] input path:', filePath);
@@ -504,7 +544,7 @@ app.get('/api/me/session', authenticateToken, async (req, res) => {
     try {
         const userId = getUserIdFromToken(req);
         const userResult = await pool.query(
-            `SELECT id, username, role
+            `SELECT id, username, email, role
              FROM users
              WHERE id = $1`,
             [userId]
@@ -531,6 +571,7 @@ app.get('/api/me/session', authenticateToken, async (req, res) => {
             user: {
                 id: user.id,
                 username: user.username,
+                email: user.email,
                 role: user.role,
                 theme_id
             }
@@ -538,6 +579,62 @@ app.get('/api/me/session', authenticateToken, async (req, res) => {
     } catch (err) {
         console.error('Gagal validasi sesi login:', err.message);
         res.status(500).json({ message: 'Gagal memvalidasi sesi login.' });
+    }
+});
+
+app.post('/api/me/change-password', authenticateToken, async (req, res) => {
+    const userId = getUserIdFromToken(req);
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+
+    try {
+        if (!currentPassword.trim()) {
+            return res.status(400).json({ message: 'Password saat ini wajib diisi.' });
+        }
+
+        const passwordError = validatePassword(newPassword);
+        if (passwordError) {
+            return res.status(400).json({ message: passwordError });
+        }
+
+        const userResult = await pool.query(
+            'SELECT id, password FROM users WHERE id = $1',
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User tidak ditemukan.' });
+        }
+
+        const user = userResult.rows[0];
+        const passwordMatches = await bcrypt.compare(currentPassword, user.password);
+
+        if (!passwordMatches) {
+            return res.status(401).json({ message: 'Password saat ini tidak sesuai.' });
+        }
+
+        const isSamePassword = await bcrypt.compare(newPassword, user.password);
+        if (isSamePassword) {
+            return res.status(400).json({ message: 'Password baru harus berbeda dari password saat ini.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        await pool.query(
+            'UPDATE users SET password = $1 WHERE id = $2',
+            [hashedPassword, userId]
+        );
+
+        await touchUserActivity(userId, {
+            sessionId: req.user?.sid || null,
+            activityReason: 'change-password'
+        });
+
+        res.json({ message: 'Password berhasil diperbarui.' });
+    } catch (err) {
+        console.error('Gagal mengganti password user:', err.message);
+        res.status(500).json({ message: 'Gagal mengganti password.' });
     }
 });
 
@@ -628,48 +725,21 @@ app.post('/api/register', async (req, res) => {
   try {
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const normalizedUsername = String(username || '').trim();
-    const normalizedPassword = String(password || '');
+    const normalizedPassword = String(password || '').trim();
 
-    const allowedDomains = [
-      'gmail.com',
-      'yahoo.com',
-      'outlook.com',
-      'hotmail.com',
-      'icloud.com'
-    ];
-
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
-
-    if (!normalizedUsername) {
-      return res.status(400).json({ message: 'Username wajib diisi.' });
+    const usernameError = validateUsername(normalizedUsername);
+    if (usernameError) {
+      return res.status(400).json({ message: usernameError });
     }
 
-    if (normalizedUsername.length < 3) {
-      return res.status(400).json({ message: 'Username minimal 3 karakter.' });
+    const emailError = validateEmail(normalizedEmail);
+    if (emailError) {
+      return res.status(400).json({ message: emailError });
     }
 
-    if (!normalizedEmail) {
-      return res.status(400).json({ message: 'Email wajib diisi.' });
-    }
-
-    if (!emailRegex.test(normalizedEmail)) {
-      return res.status(400).json({ message: 'Format email tidak valid.' });
-    }
-
-    const emailDomain = normalizedEmail.split('@')[1];
-
-    if (!allowedDomains.includes(emailDomain)) {
-      return res.status(400).json({
-        message: 'Gunakan email yang valid'
-      });
-    }
-
-    if (!normalizedPassword) {
-      return res.status(400).json({ message: 'Password wajib diisi.' });
-    }
-
-    if (normalizedPassword.length < 6) {
-      return res.status(400).json({ message: 'Password minimal 6 karakter.' });
+    const passwordError = validatePassword(normalizedPassword);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
 
     const existing = await pool.query(
@@ -828,6 +898,7 @@ app.post('/api/login', async (req, res) => {
             user: { 
                 id: user.id, 
                 username: user.username,
+                email: user.email,
                 role: user.role,
                 theme_id: theme_id 
             } 

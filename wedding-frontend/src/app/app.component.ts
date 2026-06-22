@@ -151,14 +151,28 @@ interface MenuItem { id: string; label: string; iconPath: string; }
                </div>
                <div class="absolute inset-0 z-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" *ngIf="headerImage()"></div>
 
-                <button 
-                   *ngIf="!isHeaderImageEditMode()"
-                   (pointerdown)="$event.stopPropagation()"
-                   (click)="logout()" 
-                   class="absolute top-5 right-5 z-[70] bg-red-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-full text-[10px] md:text-xs font-bold shadow-lg hover:bg-red-600 transition-all active:scale-95 flex items-center gap-1 md:gap-2">
-                  <svg viewBox="0 0 24 24" class="w-3.5 h-3.5 md:w-4 md:h-4 fill-none stroke-current" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M21 5v14"></path></svg>
-                  <span class="hidden sm:inline">Keluar</span>
-               </button>
+                <div *ngIf="!isHeaderImageEditMode()" class="absolute top-5 right-5 z-[70] flex items-center gap-2">
+                  <button
+                     type="button"
+                     (pointerdown)="$event.stopPropagation()"
+                     (click)="toggleProfilePanel()"
+                     class="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/22 text-white shadow-lg backdrop-blur-md transition hover:bg-white/32 active:scale-95"
+                     aria-label="Buka profil"
+                  >
+                     <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 21a8 8 0 0 0-16 0"></path>
+                        <circle cx="12" cy="8" r="4"></circle>
+                     </svg>
+                  </button>
+
+                  <button 
+                     (pointerdown)="$event.stopPropagation()"
+                     (click)="logout()" 
+                     class="bg-red-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-full text-[10px] md:text-xs font-bold shadow-lg hover:bg-red-600 transition-all active:scale-95 flex items-center gap-1 md:gap-2">
+                    <svg viewBox="0 0 24 24" class="w-3.5 h-3.5 md:w-4 md:h-4 fill-none stroke-current" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M21 5v14"></path></svg>
+                    <span class="hidden sm:inline">Keluar</span>
+                 </button>
+               </div>
 
                
                <div class="absolute top-5 left-5 z-[60] flex items-center gap-2 md:gap-3">
@@ -2301,6 +2315,163 @@ interface MenuItem { id: string; label: string; iconPath: string; }
 
                </main>
 
+               @if (isProfilePanelOpen()) {
+                  <div class="fixed inset-0 z-[95] bg-slate-950/45 backdrop-blur-sm px-4 py-6" (click)="closeProfilePanel()">
+                     <div class="mx-auto mt-10 w-full max-w-md rounded-[2rem] border border-white/60 bg-white/95 p-5 shadow-[0_30px_100px_rgba(15,23,42,0.25)] backdrop-blur-xl animate-in zoom-in-95 duration-200" (click)="$event.stopPropagation()">
+                        <div class="flex items-start justify-between gap-4">
+                           <div>
+                              <p class="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">Profil Akun</p>
+                              <h3 class="mt-2 text-2xl font-black text-slate-900">{{ authService.currentUser()?.username }}</h3>
+                              <p class="mt-1 text-sm font-semibold text-slate-500">{{ authService.currentUser()?.email || 'Email tidak tersedia' }}</p>
+                           </div>
+
+                           <button
+                              type="button"
+                              (click)="closeProfilePanel()"
+                              class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                           >
+                              <svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                 <path d="M18 6 6 18"></path>
+                                 <path d="m6 6 12 12"></path>
+                              </svg>
+                           </button>
+                        </div>
+
+                        <div class="mt-5 grid gap-3 rounded-[1.5rem] border border-slate-100 bg-slate-50/80 p-4">
+                           <div class="flex items-center justify-between gap-4">
+                              <span class="text-sm font-bold text-slate-500">Role</span>
+                              <span class="rounded-full bg-[#3e47e8]/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#3e47e8]">
+                                 {{ authService.currentUser()?.role === 'admin' ? 'Admin' : 'User' }}
+                              </span>
+                           </div>
+                           <div class="flex items-center justify-between gap-4">
+                              <span class="text-sm font-bold text-slate-500">Status sesi</span>
+                              <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-emerald-600">
+                                 Aktif
+                              </span>
+                           </div>
+                        </div>
+
+                        <div class="mt-5">
+                           <div class="mb-3 flex items-center justify-between gap-3">
+                              <div>
+                                 <p class="text-sm font-black text-slate-900">Ganti Password</p>
+                                 <p class="text-xs leading-relaxed text-slate-400">Gunakan password baru yang lebih kuat dan mudah kamu ingat.</p>
+                              </div>
+                           </div>
+
+                           @if (profileSuccessMessage()) {
+                              <div class="mb-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                                 {{ profileSuccessMessage() }}
+                              </div>
+                           }
+
+                           @if (profileErrorMessage()) {
+                              <div class="mb-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                                 {{ profileErrorMessage() }}
+                              </div>
+                           }
+
+                           <div class="space-y-3">
+                              <input
+                                 [(ngModel)]="profileCurrentPassword"
+                                 [type]="showProfilePasswords() ? 'text' : 'password'"
+                                 placeholder="Password saat ini"
+                                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#3e47e8] focus:ring-4 focus:ring-[#3e47e8]/10"
+                              >
+                              <input
+                                 [(ngModel)]="profileNewPassword"
+                                 [type]="showProfilePasswords() ? 'text' : 'password'"
+                                 placeholder="Password baru"
+                                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#3e47e8] focus:ring-4 focus:ring-[#3e47e8]/10"
+                              >
+                              <input
+                                 [(ngModel)]="profileConfirmPassword"
+                                 [type]="showProfilePasswords() ? 'text' : 'password'"
+                                 placeholder="Konfirmasi password baru"
+                                 class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#3e47e8] focus:ring-4 focus:ring-[#3e47e8]/10"
+                              >
+                           </div>
+
+                           <div class="mt-3 flex items-center justify-between gap-3">
+                              <button
+                                 type="button"
+                                 (click)="toggleProfilePasswordVisibility()"
+                                 class="text-xs font-bold text-slate-500 transition hover:text-slate-700"
+                              >
+                                 {{ showProfilePasswords() ? 'Sembunyikan password' : 'Lihat password' }}
+                              </button>
+
+                              <button
+                                 type="button"
+                                 (click)="submitProfilePasswordChange()"
+                                 [disabled]="isChangingPassword()"
+                                 class="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_#3e47e8_0%,_#2ae6e1_100%)] px-5 py-3 text-xs font-black uppercase tracking-[0.22em] text-white shadow-[0_18px_40px_rgba(62,71,232,0.2)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                 @if (isChangingPassword()) {
+                                    <svg viewBox="0 0 24 24" class="h-4 w-4 animate-spin fill-none stroke-current" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                       <path d="M21 12a9 9 0 1 1-6.22-8.56"></path>
+                                    </svg>
+                                    Menyimpan
+                                 } @else {
+                                    Simpan Password
+                                 }
+                              </button>
+                           </div>
+
+                           <p class="mt-3 text-xs leading-relaxed text-slate-400">
+                              Jika suatu saat lupa password dan tidak bisa login, reset penuh tetap bisa dibantu admin agar alurnya aman.
+                           </p>
+                        </div>
+                     </div>
+                  </div>
+               }
+
+               @if (confirmDialogOpen()) {
+                  <div class="fixed inset-0 z-[96] bg-slate-950/45 backdrop-blur-sm px-4 py-6" (click)="cancelConfirmDialog()">
+                     <div class="mx-auto mt-16 w-full max-w-md rounded-[2rem] border border-white/60 bg-white/95 p-5 shadow-[0_30px_100px_rgba(15,23,42,0.25)] backdrop-blur-xl animate-in zoom-in-95 duration-200" (click)="$event.stopPropagation()">
+                        <div class="flex items-start gap-4">
+                           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                              [class.bg-red-50]="confirmDialogTone() === 'danger'"
+                              [class.text-red-500]="confirmDialogTone() === 'danger'"
+                              [class.bg-sky-50]="confirmDialogTone() !== 'danger'"
+                              [class.text-[#3e47e8]]="confirmDialogTone() !== 'danger'">
+                              <svg viewBox="0 0 24 24" class="h-6 w-6 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                 <path d="M12 9v4"></path>
+                                 <path d="M12 17h.01"></path>
+                                 <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"></path>
+                              </svg>
+                           </div>
+
+                           <div class="min-w-0">
+                              <h3 class="text-xl font-black text-slate-900">{{ confirmDialogTitle() }}</h3>
+                              <p class="mt-2 text-sm leading-relaxed text-slate-500">{{ confirmDialogMessage() }}</p>
+                           </div>
+                        </div>
+
+                        <div class="mt-6 flex justify-end gap-3">
+                           <button
+                              type="button"
+                              (click)="cancelConfirmDialog()"
+                              class="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                           >
+                              Batal
+                           </button>
+                           <button
+                              type="button"
+                              (click)="acceptConfirmDialog()"
+                              class="rounded-full px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white transition"
+                              [class.bg-red-500]="confirmDialogTone() === 'danger'"
+                              [class.hover:bg-red-600]="confirmDialogTone() === 'danger'"
+                              [class.bg-[#3e47e8]]="confirmDialogTone() !== 'danger'"
+                              [class.hover:bg-[#3540dc]]="confirmDialogTone() !== 'danger'">
+                              Ya, lanjutkan
+                           </button>
+                        </div>
+                     </div>
+                  </div>
+               }
+
                @if (lightboxVendor(); as vendor) {
                   <div class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200">
                      
@@ -2590,9 +2761,22 @@ export class App implements OnInit, OnDestroy {
    showCategoryManager = signal(false);
    showVendorCategoryManager = signal(false);
    showGuestCategoryManager = signal(false);
+   isProfilePanelOpen = signal(false);
+   isChangingPassword = signal(false);
+   profileErrorMessage = signal('');
+   profileSuccessMessage = signal('');
+   showProfilePasswords = signal(false);
+   confirmDialogOpen = signal(false);
+   confirmDialogTitle = signal('Konfirmasi');
+   confirmDialogMessage = signal('');
+   confirmDialogTone = signal<'default' | 'danger'>('default');
+   private confirmDialogResolver: ((value: boolean) => void) | null = null;
    broadcastTemplate = signal('Halo {name}, kami mengundang Anda untuk hadir di acara pernikahan kami. Mohon doa restu Anda. Terima kasih!');
    allowResend = signal(false);
    weddingDate = signal(this.getTodayDate());
+   profileCurrentPassword = '';
+   profileNewPassword = '';
+   profileConfirmPassword = '';
 
    formatDisplayDateLong(dateString: string): string {
       if (!dateString) return '-';
@@ -3825,8 +4009,12 @@ export class App implements OnInit, OnDestroy {
       this.onHeaderImageSelected(inputEvent);
    }
 
-   removeHeaderImage(input?: HTMLInputElement) {
-      const confirmed = confirm('Hapus header image Summary?');
+   async removeHeaderImage(input?: HTMLInputElement) {
+      const confirmed = await this.askForConfirmation(
+         'Hapus Header Image',
+         'Header image summary akan dihapus dari tampilan. Lanjutkan?',
+         'danger'
+      );
       if (!confirmed) return;
 
       const user = this.authService.currentUser();
@@ -3897,6 +4085,108 @@ export class App implements OnInit, OnDestroy {
       }
    }
 
+   toggleProfilePanel() {
+      const nextValue = !this.isProfilePanelOpen();
+      this.isProfilePanelOpen.set(nextValue);
+
+      if (nextValue) {
+         this.profileErrorMessage.set('');
+         this.profileSuccessMessage.set('');
+      }
+   }
+
+   closeProfilePanel() {
+      this.isProfilePanelOpen.set(false);
+      this.profileErrorMessage.set('');
+      this.profileSuccessMessage.set('');
+      this.showProfilePasswords.set(false);
+      this.profileCurrentPassword = '';
+      this.profileNewPassword = '';
+      this.profileConfirmPassword = '';
+   }
+
+   toggleProfilePasswordVisibility() {
+      this.showProfilePasswords.set(!this.showProfilePasswords());
+   }
+
+   private validateProfilePasswordForm() {
+      if (!this.profileCurrentPassword.trim()) {
+         this.profileErrorMessage.set('Password saat ini wajib diisi.');
+         return false;
+      }
+
+      if (!this.profileNewPassword.trim()) {
+         this.profileErrorMessage.set('Password baru wajib diisi.');
+         return false;
+      }
+
+      if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(this.profileNewPassword)) {
+         this.profileErrorMessage.set('Password baru minimal 8 karakter dan harus mengandung huruf besar, huruf kecil, serta angka.');
+         return false;
+      }
+
+      if (this.profileNewPassword !== this.profileConfirmPassword) {
+         this.profileErrorMessage.set('Konfirmasi password baru belum sama.');
+         return false;
+      }
+
+      return true;
+   }
+
+   submitProfilePasswordChange() {
+      this.profileErrorMessage.set('');
+      this.profileSuccessMessage.set('');
+
+      if (!this.validateProfilePasswordForm()) {
+         return;
+      }
+
+      this.isChangingPassword.set(true);
+
+      this.authService.changePassword(
+         this.profileCurrentPassword,
+         this.profileNewPassword
+      ).subscribe({
+         next: (res) => {
+            this.isChangingPassword.set(false);
+            this.profileSuccessMessage.set(res?.message || 'Password berhasil diperbarui.');
+            this.profileCurrentPassword = '';
+            this.profileNewPassword = '';
+            this.profileConfirmPassword = '';
+            this.showProfilePasswords.set(false);
+            this.cdr.markForCheck();
+         },
+         error: (err) => {
+            this.isChangingPassword.set(false);
+            this.profileErrorMessage.set(err?.error?.message || 'Gagal mengganti password.');
+            this.cdr.markForCheck();
+         }
+      });
+   }
+
+   private askForConfirmation(title: string, message: string, tone: 'default' | 'danger' = 'danger') {
+      this.confirmDialogTitle.set(title);
+      this.confirmDialogMessage.set(message);
+      this.confirmDialogTone.set(tone);
+      this.confirmDialogOpen.set(true);
+
+      return new Promise<boolean>((resolve) => {
+         this.confirmDialogResolver = resolve;
+      });
+   }
+
+   acceptConfirmDialog() {
+      this.confirmDialogOpen.set(false);
+      this.confirmDialogResolver?.(true);
+      this.confirmDialogResolver = null;
+   }
+
+   cancelConfirmDialog() {
+      this.confirmDialogOpen.set(false);
+      this.confirmDialogResolver?.(false);
+      this.confirmDialogResolver = null;
+   }
+
    // --- RESET STATE (PENTING UNTUK LOGOUT) ---
    private resetState() {
       localStorage.removeItem('user_theme');
@@ -3913,6 +4203,7 @@ export class App implements OnInit, OnDestroy {
       this.headerImagePosX.set(50);
       this.headerImagePosY.set(50);
       this.isHeaderImageEditMode.set(false);
+      this.closeProfilePanel();
       this.weddingTitle.set('The Wedding of Us');
       this.totalBudget.set(100000000);
 
@@ -4116,9 +4407,17 @@ export class App implements OnInit, OnDestroy {
    }
    editGuest(guest: Guest) { this.newGuest = { ...guest }; this.editingGuestId.set(guest.id!); document.getElementById('guestForm')?.scrollIntoView({ behavior: 'smooth' }); }
    cancelEditGuest() { this.editingGuestId.set(null); this.newGuest = { name: '', phone: '', side: 'CPP', category: 'Keluarga' }; }
-   deleteGuest(id: number) { 
+   async deleteGuest(id: number) { 
       const uid = this.authService.currentUser().id;
-      if(confirm('Hapus tamu ini?')) this.dataService.deleteGuest(uid, id).subscribe(() => this.loadData()); 
+      const confirmed = await this.askForConfirmation(
+         'Hapus Data Tamu',
+         'Data tamu ini akan dihapus dari daftar. Lanjutkan?',
+         'danger'
+      );
+
+      if (confirmed) {
+         this.dataService.deleteGuest(uid, id).subscribe(() => this.loadData());
+      }
    }
    toggleSelectAll(e: any) { 
       const checked = e.target.checked;
@@ -4160,7 +4459,7 @@ export class App implements OnInit, OnDestroy {
          });
       });
    }
-   deleteSelectedGuests() {
+   async deleteSelectedGuests() {
       const uid = this.authService.currentUser().id;
       const selectedGuests = this.guests().filter(g => g.selected);
 
@@ -4178,8 +4477,10 @@ export class App implements OnInit, OnDestroy {
          ? `\n...dan ${selectedGuests.length - 5} tamu lainnya`
          : '';
 
-      const confirmed = confirm(
-         `Yakin ingin menghapus ${selectedGuests.length} tamu yang dipilih?\n\n${guestNamesPreview}${moreText}\n\nData tamu yang dihapus tidak dapat dikembalikan.`
+      const confirmed = await this.askForConfirmation(
+         'Hapus Beberapa Tamu',
+         `Akan menghapus ${selectedGuests.length} tamu terpilih.${selectedGuests.length > 0 ? ` Contoh: ${selectedGuests.slice(0, 2).map(g => g.name).join(', ')}${selectedGuests.length > 2 ? ', dan lainnya' : ''}.` : ''} Data yang dihapus tidak dapat dikembalikan.`,
+         'danger'
       );
 
       if (!confirmed) return;
@@ -4330,11 +4631,13 @@ export class App implements OnInit, OnDestroy {
       this.resetExpenseForm();
    }
 
-   deleteExpense(id: number) {
+   async deleteExpense(id: number) {
       const expense = this.expenses().find(e => e.id === id);
 
-      const confirmed = confirm(
-         `Yakin ingin menghapus pengeluaran "${expense?.item || 'ini'}"?`
+      const confirmed = await this.askForConfirmation(
+         'Hapus Pengeluaran',
+         `Pengeluaran "${expense?.item || 'ini'}" akan dihapus permanen dari daftar. Lanjutkan?`,
+         'danger'
       );
 
       if (!confirmed) return;
@@ -4463,11 +4766,13 @@ export class App implements OnInit, OnDestroy {
    cancelEditPrewed() { 
       this.resetPrewedForm();
    }
-   deletePrewed(id: number) {
+   async deletePrewed(id: number) {
       const loc = this.prewedLocations().find(p => p.id === id);
 
-      const confirmed = confirm(
-         `Yakin ingin menghapus lokasi prewed "${loc?.name || 'ini'}"?`
+      const confirmed = await this.askForConfirmation(
+         'Hapus Lokasi Prewed',
+         `Lokasi prewed "${loc?.name || 'ini'}" akan dihapus dari daftar. Lanjutkan?`,
+         'danger'
       );
 
       if (!confirmed) return;
@@ -4585,11 +4890,13 @@ export class App implements OnInit, OnDestroy {
    cancelEditVendor() { 
       this.resetVendorForm();
    }
-   deleteVendor(id: number) {
+   async deleteVendor(id: number) {
       const vendor = this.vendors().find(v => v.id === id);
 
-      const confirmed = confirm(
-         `Yakin ingin menghapus vendor "${vendor?.name || 'ini'}"?`
+      const confirmed = await this.askForConfirmation(
+         'Hapus Vendor',
+         `Vendor "${vendor?.name || 'ini'}" akan dihapus dari daftar. Lanjutkan?`,
+         'danger'
       );
 
       if (!confirmed) return;
@@ -4670,11 +4977,13 @@ export class App implements OnInit, OnDestroy {
          }
       });
    }
-   deleteTodo(id: number) {
+   async deleteTodo(id: number) {
       const todo = this.todos().find(t => t.id === id);
 
-      const confirmed = confirm(
-         `Yakin ingin menghapus tugas "${todo?.task || 'ini'}"?`
+      const confirmed = await this.askForConfirmation(
+         'Hapus Tugas',
+         `Tugas "${todo?.task || 'ini'}" akan dihapus dari to-do list. Lanjutkan?`,
+         'danger'
       );
 
       if (!confirmed) return;
@@ -5078,11 +5387,15 @@ export class App implements OnInit, OnDestroy {
       });
    }
 
-   removeImageFromVendor(fileName: string) {
+   async removeImageFromVendor(fileName: string) {
       const vendorId = this.editingVendorId();
       if (!vendorId) return;
 
-      const confirmed = confirm('Hapus image vendor ini?');
+      const confirmed = await this.askForConfirmation(
+         'Hapus Foto Vendor',
+         'Foto vendor ini akan dihapus dari galeri. Lanjutkan?',
+         'danger'
+      );
       if (!confirmed) return;
 
       // filter array
@@ -5097,11 +5410,15 @@ export class App implements OnInit, OnDestroy {
       });
    }
 
-   removeImageFromPrewed(fileName: string) {
+   async removeImageFromPrewed(fileName: string) {
       const prewedId = this.editingPrewedId();
       if (!prewedId) return;
 
-      const confirmed = confirm('Hapus image lokasi prewed ini?');
+      const confirmed = await this.askForConfirmation(
+         'Hapus Foto Lokasi',
+         'Foto lokasi prewed ini akan dihapus dari galeri. Lanjutkan?',
+         'danger'
+      );
       if (!confirmed) return;
 
       this.newPrewed.images = (this.newPrewed.images || []).filter(img => img.fileName !== fileName);
@@ -5178,12 +5495,14 @@ export class App implements OnInit, OnDestroy {
       this.saveExpenseCategoriesToLocalStorage();
    }
 
-   deleteCategory(name: string) {
+   async deleteCategory(name: string) {
       const usedByExpense = this.expenses().some(exp => exp.category === name);
 
       if (usedByExpense) {
-         const confirmed = confirm(
-            `Kategori "${name}" masih digunakan pada data pengeluaran. Tetap hapus dari daftar kategori?`
+         const confirmed = await this.askForConfirmation(
+            'Hapus Kategori',
+            `Kategori "${name}" masih dipakai pada data pengeluaran. Tetap hapus dari daftar kategori?`,
+            'default'
          );
 
          if (!confirmed) return;
@@ -5299,7 +5618,7 @@ export class App implements OnInit, OnDestroy {
    }
 
    // --- BROADCAST LOGIC (BARU) ---
-   broadcastWhatsAppToSelected() {
+   async broadcastWhatsAppToSelected() {
       const selectedGuests = this.guests().filter(g => g.selected && g.phone);
 
       if (selectedGuests.length === 0) {
@@ -5314,8 +5633,10 @@ export class App implements OnInit, OnDestroy {
             .map(g => g.name)
             .join(', ');
 
-         const confirmed = confirm(
-            `Tamu berikut sudah pernah dikirim broadcast:\n\n${guestNames}\n\nApakah ingin mengirim pesan kembali ke tamu tersebut?`
+         const confirmed = await this.askForConfirmation(
+            'Kirim Ulang Broadcast',
+            `Beberapa tamu sudah pernah menerima broadcast, termasuk ${guestNames}. Apakah kamu ingin mengirim ulang?`,
+            'default'
          );
 
          if (!confirmed) {
@@ -5331,15 +5652,17 @@ export class App implements OnInit, OnDestroy {
 
       this.isBroadcastMode.set(true);
    }
-   sendWhatsApp(guest: Guest) {
+   async sendWhatsApp(guest: Guest) {
       if (!guest.phone) {
          alert('Nomor WhatsApp tidak tersedia untuk tamu ini.');
          return;
       }
 
       if (guest.invited && !this.allowResend()) {
-         const confirmed = confirm(
-            `Tamu "${guest.name}" sudah pernah dikirim broadcast.\n\nApakah ingin mengirim pesan kembali ke tamu ini?`
+         const confirmed = await this.askForConfirmation(
+            'Kirim Ulang ke Tamu',
+            `Tamu "${guest.name}" sudah pernah menerima broadcast. Kirim ulang sekarang?`,
+            'default'
          );
 
          if (!confirmed) {
@@ -5501,18 +5824,25 @@ export class App implements OnInit, OnDestroy {
       }, this.idleLimitMs);
    }
 
-   logout() {
-      if (confirm('Yakin ingin keluar aplikasi?')) {
-         if (this.idleTimeout) {
-            clearTimeout(this.idleTimeout);
-            this.idleTimeout = null;
-         }
+   async logout() {
+      const confirmed = await this.askForConfirmation(
+         'Keluar dari Aplikasi',
+         'Sesi login ini akan ditutup dan kamu akan diarahkan ke halaman login. Lanjutkan?',
+         'default'
+      );
 
-         this.authService.logout();
-         this.resetState();
-         this.publicPage.set('login');
-         this.router.navigateByUrl('/login');
+      if (!confirmed) return;
+
+      if (this.idleTimeout) {
+         clearTimeout(this.idleTimeout);
+         this.idleTimeout = null;
       }
+
+      this.closeProfilePanel();
+      this.authService.logout();
+      this.resetState();
+      this.publicPage.set('login');
+      this.router.navigateByUrl('/login');
    }
    autoLogoutByIdle() {
       if (this.idleTimeout) {

@@ -28,6 +28,20 @@ export class AuthService {
     return this.http.post(`${this.apiUrl}/register`, { username, email, password });
   }
 
+  changePassword(currentPassword: string, newPassword: string): Observable<any> {
+    const token = localStorage.getItem('token');
+
+    return this.http.post(
+      `${this.apiUrl}/me/change-password`,
+      { currentPassword, newPassword },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+  }
+
   login(identifier: string, password: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/login`, { identifier, password }).pipe(
       tap((response: any) => {
